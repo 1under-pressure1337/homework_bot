@@ -35,6 +35,7 @@ HOMEWORK_STATUSES = {
 
 
 def send_message(bot, message):
+    """Отправка сообщения в Telegram-чат."""
     bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
     logger.info('Сообщение успешно отправлено в Telegram')
 
