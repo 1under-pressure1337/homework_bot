@@ -34,10 +34,16 @@ HOMEWORK_STATUSES = {
 }
 
 
-def send_message(bot, message):
+def send_message(bot: Bot, message: str):
     """Отправка сообщения в Telegram-чат."""
-    bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
-    logger.info('Сообщение успешно отправлено в Telegram')
+    try:
+        bot.send_message(TELEGRAM_CHAT_ID, message)
+        logger.info(f'Бот отправил сообщение {message}')
+    except Exception:
+        logger.error(
+            f'Сбой при отправке в Телеграмм сообщения "{message}"',
+            exc_info=True
+        )
 
 
 def get_api_answer(current_timestamp):
@@ -50,21 +56,20 @@ def get_api_answer(current_timestamp):
     except requests.exceptions.RequestException as error:
         logger.error('API недоступно')
         raise SystemExit(f'API недоступно: {error}')
+    if response.status_code == HTTPStatus.OK:
+        try:
+            homeworks = response.json()
+        except json.decoder.JSONDecodeError as error:
+            logger.error('Не удалось разобрать овтет от API')
+            raise requests.JSONDecodeError(f'Не удается разобрать ответ от'
+                                           f'API: {error}')
+    elif response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR:
+        logger.error('API-сервис не доступен')
+        raise HTTPError('API-сервис не доступен')
     else:
-        if response.status_code == HTTPStatus.OK:
-            try:
-                homeworks = response.json()
-            except json.decoder.JSONDecodeError as error:
-                logger.error('Не удалось разобрать овтет от API')
-                raise requests.JSONDecodeError(f'Не удается разобрать ответ от'
-                                               f'API: {error}')
-        elif response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR:
-            logger.error('API-сервис не доступен')
-            raise HTTPError('API-сервис не доступен')
-        else:
-            logger.error('Неполадки во время выполнения запроса к API-сервису')
-            raise HTTPError('Неполадки во время выполнения запроса к'
-                            'API-сервису')
+        logger.error('Неполадки во время выполнения запроса к API-сервису')
+        raise HTTPError('Неполадки во время выполнения запроса к'
+                        'API-сервису')
     return homeworks
 
 
@@ -88,8 +93,8 @@ def check_response(response):
 
 def parse_status(homework):
     """Объявление статуса домашней работы."""
-    homework_name = homework['homework_name']
-    homework_status = homework['status']
+    homework_name = homework.get('homework_name')
+    homework_status = homework.get('status')
     verdict = HOMEWORK_STATUSES[homework_status]
     message = f'Изменился статус проверки работы "{homework_name}". {verdict}'
     if homework_name is None or homework_status is None:
@@ -103,12 +108,7 @@ def parse_status(homework):
 
 def check_tokens():
     """Проверка валидности токена."""
-    if (PRACTICUM_TOKEN is None
-            or TELEGRAM_CHAT_ID is None
-            or TELEGRAM_TOKEN is None):
-        logger.critical('отсутствие обязательных переменных окружения')
-        return False
-    return True
+    return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
 
 
 def main():
